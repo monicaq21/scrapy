@@ -12,7 +12,7 @@ from twisted.internet.defer import (
     inlineCallbacks,
     maybeDeferred,
 )
-# test comment
+
 try:
     # zope >= 5.0 only supports MultipleInvalid
     from zope.interface.exceptions import MultipleInvalid
@@ -163,6 +163,38 @@ class Crawler:
             if self.engine is not None:
                 yield self.engine.close()
             raise
+
+    # @inlineCallbacks
+    # def crawl(self, *args: Any, **kwargs: Any) -> Generator[Deferred, Any, None]:
+    #     if self.crawling:
+    #         raise RuntimeError("Crawling already taking place")
+    #     if self._started:
+    #         warnings.warn(
+    #             "Running Crawler.crawl() more than once is deprecated.",
+    #             ScrapyDeprecationWarning,
+    #             stacklevel=2,
+    #         )
+    #     self.crawling = self._started = True
+
+    def errorHandler(failure, self):
+        failure.trap(Exception)
+        self.crawling = False
+        if self.engine is not None:
+            yield self.engine.close()
+        # raise
+
+    def crawlHelper(self, *args: Any, **kwargs: Any) -> Generator[Deferred, Any, None]:
+        self.spider = self._create_spider(*args, **kwargs)
+        self._apply_settings()
+        self._update_root_log_handler()
+        self.engine = self._create_engine()
+        start_requests = iter(self.spider.start_requests())
+        yield self.engine.open_spider(self.spider, start_requests)
+        yield maybeDeferred(self.engine.start)
+
+    d = Deferred()
+    d.addCallback(crawlHelper)
+    d.addErrback(errorHandler)
 
     def _create_spider(self, *args: Any, **kwargs: Any) -> Spider:
         return self.spidercls.from_crawler(self, *args, **kwargs)
