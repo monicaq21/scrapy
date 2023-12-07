@@ -167,9 +167,13 @@ def create_instance(objcls, settings, crawler, *args, **kwargs):
 def build_from_crawler(objcls, crawler, *args, **kwargs):
     if crawler is None:
         raise ValueError("Specify crawler.")
+    settings = crawler.settings
     if crawler and hasattr(objcls, "from_crawler"):
         instance = objcls.from_crawler(crawler, *args, **kwargs)
         method_name = "from_crawler"
+    elif hasattr(objcls, "from_settings"):
+        instance = objcls.from_settings(settings, *args, **kwargs)
+        method_name = "from_settings"
     else:
         instance = objcls(*args, **kwargs)
         method_name = "__new__"
