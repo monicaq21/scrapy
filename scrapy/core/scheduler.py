@@ -14,7 +14,7 @@ from scrapy.http.request import Request
 from scrapy.spiders import Spider
 from scrapy.statscollectors import StatsCollector
 from scrapy.utils.job import job_dir
-from scrapy.utils.misc import create_instance, load_object
+from scrapy.utils.misc import build_from_crawler, build_from_settings, load_object
 
 if TYPE_CHECKING:
     # typing.Self requires Python 3.11
@@ -201,8 +201,12 @@ class Scheduler(BaseScheduler):
         Factory method, initializes the scheduler with arguments taken from the crawl settings
         """
         dupefilter_cls = load_object(crawler.settings["DUPEFILTER_CLASS"])
+        if crawler is not None:
+            dupefilter = build_from_crawler(dupefilter_cls, crawler)
+        else:
+            dupefilter = build_from_settings(dupefilter_cls, crawler.settings)
         return cls(
-            dupefilter=create_instance(dupefilter_cls, crawler.settings, crawler),
+            dupefilter=dupefilter,
             jobdir=job_dir(crawler.settings),
             dqclass=load_object(crawler.settings["SCHEDULER_DISK_QUEUE"]),
             mqclass=load_object(crawler.settings["SCHEDULER_MEMORY_QUEUE"]),
@@ -322,9 +326,8 @@ class Scheduler(BaseScheduler):
 
     def _mq(self):
         """Create a new priority queue instance, with in-memory storage"""
-        return create_instance(
+        return build_from_crawler(
             self.pqclass,
-            settings=None,
             crawler=self.crawler,
             downstream_queue_cls=self.mqclass,
             key="",
@@ -334,9 +337,8 @@ class Scheduler(BaseScheduler):
         """Create a new priority queue instance, with disk storage"""
         assert self.dqdir
         state = self._read_dqs_state(self.dqdir)
-        q = create_instance(
+        q = build_from_crawler(
             self.pqclass,
-            settings=None,
             crawler=self.crawler,
             downstream_queue_cls=self.dqclass,
             key=self.dqdir,
